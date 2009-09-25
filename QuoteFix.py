@@ -1,7 +1,7 @@
 """
 QuoteFix - a Mail.app plug-in to fix some annoyances when replying to e-mail
 
-Version: $Rev: 28 $
+Version: $Rev: 29 $
 """
 
 from    AppKit          import *
@@ -97,9 +97,9 @@ def moveAboveNewSignature(self, dom, view):
     # signal that we removed an old signature
     return True
 
-def cleanupLayout(self, root):
+def cleanupLayout(self, dom, root):
     # clean up stray linefeeds
-    root.getElementsByTagName_("body").item_(0).removeStrayLinefeeds()
+    root.getElementsByTagName_("body").item_(0)._removeStrayLinefeedsAtBeginning()
 
     # clean up linebreaks before first blockquote
     blockquote  = root.firstDescendantBlockQuote()
@@ -172,11 +172,19 @@ def isLoaded(self, original):
         App.setHTML(root.innerHTML())
 
         # start cleaning up
-        if removeOldSignature(self, root, composeView) or moveAboveNewSignature(self, dom, composeView):
+        if removeOldSignature(self, root, composeView):
             # if we changed anything, reset the 'changed' state of the
             # compose backend
             self.backEnd().setHasChanges_(False)
-        if cleanupLayout(self, root):
+
+        # place cursor above own signature (if any)
+        if moveAboveNewSignature(self, dom, composeView):
+            self.backEnd().setHasChanges_(False)
+        else:
+            composeView.insertNewline_(self)
+
+        # perform some general cleanups
+        if cleanupLayout(self, dom, root):
             self.backEnd().setHasChanges_(False)
 
         # move to beginning of line
