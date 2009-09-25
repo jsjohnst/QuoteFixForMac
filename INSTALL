@@ -17,8 +17,3 @@ In Snow Leopard, mail plug-ins must declare, in their Info.plist, with
 which versions of Mail.app en Message.framework they are compatible with.
 See the 'plist' dict in setup.py (the 'SupportedPluginCompatibilityUUIDs'
 key).
-
-Also, the plug-in only works when you run Mail.app in 32-bit mode (this is
-because [NSObject poseAsClass] isn't available in 64-bit mode. You can make
-Mail.app run in 32-bit mode by selecting the application in Finder, Cmd-I
-to open the Info window, and selecting "Open in 32-bit mode".
