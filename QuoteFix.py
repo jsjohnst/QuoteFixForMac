@@ -1,7 +1,7 @@
 """
 QuoteFix - a Mail.app plug-in to fix some annoyances when replying to e-mail
 
-Version: $Rev: 18 $
+Version: $Rev: 20 $
 
 """
 from    AppKit      import *
@@ -30,23 +30,32 @@ class MyMailDocumentEditor(MailDocumentEditor):
             return False
 
         # find BR nodes so we can match "<br>-- "
-        brs = blockquote.getElementsByTagName_("br")
-        for j in range(brs.length()):
-            br = brs.item_(j)
-            # pick BR's with a quotelevel of 1 (in the first reply)
-            if br.quoteLevel() != 1:
+        nodes   = []
+        brs     = blockquote.getElementsByTagName_("br")
+        nodes  += [ brs.item_(j) for j in range(brs.length()) ]
+        divs    = blockquote.getElementsByTagName_("div")
+        nodes  += [ divs.item_(j) for j in range(divs.length()) ]
+        for node in nodes:
+            # pick nodes with a quotelevel of 1 (in the first reply)
+            if node.quoteLevel() != 1:
                 continue
 
-            # find next sibling
-            sibling = br.nextSibling()
+            # take stringvalue and innerHTML to check for signatures
+            sv = node.stringValue() or ""
+            ih = node.innerHTML()   or ""
 
-            # should be a text-node
-            if not sibling or not sibling.stringValue().startswith("-- "):
-                continue
+            # check nodes
+            if node.nodeName().lower() == 'div':
+                if not ih.startswith("--&nbsp;") and not sv.startswith("-- "):
+                    continue
+            elif node.nodeName().lower() == 'br':
+                node = node.nextSibling()
+                if not node or not (node.stringValue() or "").startswith("-- "):
+                    continue
 
             # set selection range
             domrange = view.selectedDOMRange()
-            domrange.setStartBefore_(br)
+            domrange.setStartBefore_(node)
             domrange.setEndAfter_(blockquote)
 
             # create selection
@@ -159,4 +168,4 @@ class QuoteFix(MVMailBundle):
     def initialize (cls):
         MVMailBundle.registerBundle()
         MyMailDocumentEditor.poseAsClass_(MailDocumentEditor)
-        NSLog("QuoteFix Plugin ($Rev: 18 $) registered with Mail.app")
+        NSLog("QuoteFix Plugin ($Rev: 20 $) registered with Mail.app")
