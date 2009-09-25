@@ -1,7 +1,7 @@
 """
 QuoteFix - a Mail.app plug-in to fix some annoyances when replying to e-mail
 
-Version: $Rev: 21 $
+Version: $Rev: 22 $
 
 """
 from    AppKit      import *
@@ -122,12 +122,23 @@ class MyMailDocumentEditor(MailDocumentEditor):
 
     def isLoaded(self):
         global isQuoteFixed
+
         # call superclass method first
         isloaded = super(self.__class__, self).isLoaded()
+        if not isloaded:
+            return isloaded
 
-        # messagetype == 1 -> reply
-        # messagetype == 2 -> reply to all
-        if not isloaded or self in isQuoteFixed or self.messageType() not in [1, 2]:
+        # check if this message was already quotefixed
+        if self in isQuoteFixed:
+            return isloaded
+
+        # check for the right kind of message:
+        #   messagetype == 1 -> reply           (will  be fixed)
+        #   messagetype == 2 -> reply to all    (will  be fixed)    
+        #   messagetype == 3 -> forward         (will  be fixed)
+        #   messagetype == 4 -> is draft        (won't be fixed)
+        #   messagetype == 5 -> new message     (won't be fixed)
+        if self.messageType() not in [1, 2, 3]:
             return isloaded
 
         # grab composeView instance (this is the WebView which contains the
@@ -148,7 +159,7 @@ class MyMailDocumentEditor(MailDocumentEditor):
             backend = self.backEnd()
             message = backend.message()
             is_rich = backend.containsRichText()
-            frame   = composeView.selectedFrame()
+            frame   = composeView.mainFrame()
             dom     = frame.DOMDocument()
             root    = dom.documentElement()
             if self.removeOldSignature(root, composeView) or self.moveAboveNewSignature(root, composeView):
@@ -158,7 +169,7 @@ class MyMailDocumentEditor(MailDocumentEditor):
             if self.cleanupLayout(root):
                 self.backEnd().setHasChanges_(False)
         except Exception, e:
-            #raise e
+            # raise e
             pass
         return isloaded
 
@@ -168,4 +179,4 @@ class QuoteFix(MVMailBundle):
     def initialize(cls):
         MVMailBundle.registerBundle()
         MyMailDocumentEditor.poseAsClass_(MailDocumentEditor)
-        NSLog("QuoteFix Plugin ($Rev: 21 $) registered with Mail.app")
+        NSLog("QuoteFix Plugin ($Rev: 22 $) registered with Mail.app")
