@@ -5,25 +5,14 @@ import  objc
 
 class QFMenu(NSObject):
 
-    @classmethod
-    def init(cls):
-        # act as a singleton, since we only need to inject ourselves into
-        # the main Mail menu once
-        if '_instance' in cls.__dict__:
-            self = cls._instance
-            return self
+    def initWithApp_(self, app):
+        self            = super(QFMenu, self).init()
+        if self is None : return None
+        self.app        = app
+        self.mainwindow = NSApplication.sharedApplication().mainWindow()
+        return self
 
-        # create an instance
-        self = cls._instance    = NSObject.init(cls.alloc())
-        self.is_debugging       = False
-        self.mainwindow         = NSApplication.sharedApplication().mainWindow()
-
-        # check if menu should be displayed
-        userdefaults = NSUserDefaults.standardUserDefaults()
-        showDebugMenu   = userdefaults.boolForKey_('IncludeQuoteFixMenu')
-        if not showDebugMenu:
-            return self
-
+    def inject(self):
         # yes, show menu
         try:
             # necessary because of the menu callbacks
@@ -41,8 +30,9 @@ class QFMenu(NSObject):
                 newmenu.addItem_(item)
 
             # add a couple of useful items to the menu
-            addItem("Debug", "debugItemChanged:", state = 0)
-            addItem("Copy original contents to clipboard (for debugging)", "copyToClipboard:")
+            addItem("QuoteFix is %s" % (self.app.isActive() and "enabled" or "disabled"), "onOffItemChanged:", state = self.app.isActive())
+            addItem("Debug", "debugItemChanged:", state = self.app.isDebugging())
+            addItem("Copy original contents to clipboard", "copyToClipboard:")
             newmenu.addItem_(NSMenuItem.separatorItem())
             addItem("About...", "aboutItemSelected:")
 
@@ -58,15 +48,17 @@ class QFMenu(NSObject):
             raise e
         return self
 
-    def setHTML_(self, html):
-        self.html       = html
+    def setHTML(self, html):
+        self.html = html
 
     def debugItemChanged_(self, sender):
         sender.setState_(1 - sender.state())
-        self.is_debugging = not self.is_debugging
+        self.app.setIsDebugging(sender.state())
 
-    def isDebugging(self):
-        return self.is_debugging
+    def onOffItemChanged_(self, sender):
+        self.app.setIsActive(not self.app.isActive())
+        sender.setTitle_("QuoteFix is %s" % (self.app.isActive() and "enabled" or "disabled"))
+        sender.setState_(self.app.isActive())
 
     def copyToClipboard_(self, sender):
         if not self.html:
@@ -81,7 +73,7 @@ class QFMenu(NSObject):
 
     def aboutItemSelected_(self, sender):
         QFAlert.showAlert(self,
-                'QuoteFix plug-in ($Rev: 23 $)',
+                'QuoteFix plug-in (version %s)' % self.app.version,
                 '''
 For more information about this plug-in, please refer to its Google Code homepage at
 
