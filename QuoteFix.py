@@ -1,24 +1,26 @@
 """
 QuoteFix - a Mail.app plug-in to fix some annoyances when replying to e-mail
 
-Version: $Rev: 22 $
-
+Version: $Rev: 24 $
 """
-from    AppKit      import *
-from    Foundation  import *
-import  objc, re, random
+
+from    AppKit          import *
+from    Foundation      import *
+from    QFMenu          import *
+from    QFAlert         import *
+import  objc, re, random, traceback
 
 MVMailBundle        = objc.lookUpClass('MVMailBundle')
 MailDocumentEditor  = objc.lookUpClass('MailDocumentEditor')
 
-isQuoteFixed = {}
+isQuoteFixed    = {}
 
 import  random
 
-def rlog(msg):
+def nslog(msg):
     NSLog("[%.4f] %s" % (random.random(), msg))
 
-class MyMailDocumentEditor(MailDocumentEditor):
+class QFMailDocumentEditor(MailDocumentEditor):
 
     __slots__ = ()
 
@@ -77,31 +79,27 @@ class MyMailDocumentEditor(MailDocumentEditor):
 
         return False
 
-    def moveAboveNewSignature(self, root, view):
+    def moveAboveNewSignature(self, dom, view):
         # find new signature by ID
-        divs = root.getElementsByTagName_("div")
-        for i in range(divs.length()):
-            div = divs.item_(i)
-            if div.getAttribute_("id") != 'AppleMailSignature':
-                continue
+        div = dom.getElementById_("AppleMailSignature")
+        if not div:
+            return False
 
-            # set selection range
-            domrange = view.selectedDOMRange()
-            domrange.selectNode_(div)
+        # set selection range
+        domrange = view.selectedDOMRange()
+        domrange.selectNode_(div)
 
-            # create selection
-            view.setSelectedDOMRange_affinity_(domrange, 0)
+        # create selection
+        view.setSelectedDOMRange_affinity_(domrange, 0)
 
-            # move up (positions cursor above signature)
-            view.moveUp_(self)
+        # move up (positions cursor above signature)
+        view.moveUp_(self)
 
-            # and insert a paragraph break
-            view.insertParagraphSeparator_(self)
+        # and insert a paragraph break
+        view.insertParagraphSeparator_(self)
 
-            # signal that we removed an old signature
-            return True
-
-        return False
+        # signal that we removed an old signature
+        return True
 
     def cleanupLayout(self, root):
         # clean up stray linefeeds
@@ -111,7 +109,6 @@ class MyMailDocumentEditor(MailDocumentEditor):
         blockquote  = root.firstDescendantBlockQuote()
         if not blockquote:
             return True
-
         parent      = blockquote.parentNode()
         node        = blockquote.previousSibling()
         while node and node.nodeName().lower() == 'br':
@@ -134,7 +131,7 @@ class MyMailDocumentEditor(MailDocumentEditor):
 
         # check for the right kind of message:
         #   messagetype == 1 -> reply           (will  be fixed)
-        #   messagetype == 2 -> reply to all    (will  be fixed)    
+        #   messagetype == 2 -> reply to all    (will  be fixed)
         #   messagetype == 3 -> forward         (will  be fixed)
         #   messagetype == 4 -> is draft        (won't be fixed)
         #   messagetype == 5 -> new message     (won't be fixed)
@@ -154,6 +151,9 @@ class MyMailDocumentEditor(MailDocumentEditor):
         composeView.moveToEndOfDocument_(self)
         isQuoteFixed[self] = True
 
+        # get menu instance
+        menu = QFMenu.init()
+
         # perform some more modifications
         try:
             backend = self.backEnd()
@@ -162,14 +162,20 @@ class MyMailDocumentEditor(MailDocumentEditor):
             frame   = composeView.mainFrame()
             dom     = frame.DOMDocument()
             root    = dom.documentElement()
-            if self.removeOldSignature(root, composeView) or self.moveAboveNewSignature(root, composeView):
+
+            # send original HTML to menu for debugging
+            menu.setHTML_(root.innerHTML())
+
+            # start cleaning up
+            if self.removeOldSignature(root, composeView) or self.moveAboveNewSignature(dom, composeView):
                 # if we changed anything, reset the 'changed' state of the
                 # compose backend
                 self.backEnd().setHasChanges_(False)
             if self.cleanupLayout(root):
                 self.backEnd().setHasChanges_(False)
         except Exception, e:
-            # raise e
+            if menu.isDebugging():
+                QFAlert.showException(self)
             pass
         return isloaded
 
@@ -178,5 +184,6 @@ class QuoteFix(MVMailBundle):
     @classmethod
     def initialize(cls):
         MVMailBundle.registerBundle()
-        MyMailDocumentEditor.poseAsClass_(MailDocumentEditor)
-        NSLog("QuoteFix Plugin ($Rev: 22 $) registered with Mail.app")
+        QFMailDocumentEditor.poseAsClass_(MailDocumentEditor)
+        QFMenu.init()
+        NSLog("QuoteFix Plugin ($Rev: 24 $) registered with Mail.app")
