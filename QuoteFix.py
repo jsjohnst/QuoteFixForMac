@@ -1,7 +1,7 @@
 """
 QuoteFix - a Mail.app plug-in to fix some annoyances when replying to e-mail
 
-Version: $Rev: 20 $
+Version: $Rev: 21 $
 
 """
 from    AppKit      import *
@@ -10,7 +10,6 @@ import  objc, re, random
 
 MVMailBundle        = objc.lookUpClass('MVMailBundle')
 MailDocumentEditor  = objc.lookUpClass('MailDocumentEditor')
-ComposeBackEnd      = objc.lookUpClass('ComposeBackEnd')
 
 isQuoteFixed = {}
 
@@ -126,8 +125,9 @@ class MyMailDocumentEditor(MailDocumentEditor):
         # call superclass method first
         isloaded = super(self.__class__, self).isLoaded()
 
-        # messagetype = 2 == reply to message (I think)
-        if not isloaded or self in isQuoteFixed or self.messageType() != 2:
+        # messagetype == 1 -> reply
+        # messagetype == 2 -> reply to all
+        if not isloaded or self in isQuoteFixed or self.messageType() not in [1, 2]:
             return isloaded
 
         # grab composeView instance (this is the WebView which contains the
@@ -165,7 +165,7 @@ class MyMailDocumentEditor(MailDocumentEditor):
 class QuoteFix(MVMailBundle):
 
     @classmethod
-    def initialize (cls):
+    def initialize(cls):
         MVMailBundle.registerBundle()
         MyMailDocumentEditor.poseAsClass_(MailDocumentEditor)
-        NSLog("QuoteFix Plugin ($Rev: 20 $) registered with Mail.app")
+        NSLog("QuoteFix Plugin ($Rev: 21 $) registered with Mail.app")
